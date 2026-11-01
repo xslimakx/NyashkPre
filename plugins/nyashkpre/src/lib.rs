@@ -157,6 +157,7 @@ impl Plugin for NyashkPre {
     }
 
     fn process(&mut self, buffer: &mut Buffer, _aux: &mut AuxiliaryBuffers, _c: &mut impl ProcessContext<Self>) -> ProcessStatus {
+        nyashk_common::demo::sanitize(buffer);
         let Some(pre) = self.pre.as_mut() else { return ProcessStatus::Normal };
         let p = &self.params;
         let (mut ipk, mut opk) = (0.0f32, 0.0f32);

@@ -119,7 +119,7 @@ pub fn create(params: Arc<PreParams>, meters: Arc<Meters>) -> Option<Box<dyn Edi
                     painter.text(Pos2::new(r.center().x, r.bottom() + 11.0), Align2::CENTER_CENTER, name, mono(9.5), DIM);
                 }
                 painter.text(Pos2::new(dp.right() - 14.0, bt + 8.0), Align2::RIGHT_CENTER, "COLOR", mono(9.0), DIM);
-                let col = if on && st.color > -70.0 { format!("{:.0} dB", st.color) } else { "-- dB".into() };
+                let col = if on && st.color > -70.0 { format!("{:.0} dB", st.color.round() + 0.0) } else { "-- dB".into() };
                 painter.text(Pos2::new(dp.right() - 14.0, bt + 26.0), Align2::RIGHT_CENTER, col, mono(11.0), WHITE);
                 painter.text(Pos2::new(dp.right() - 14.0, bt + 46.0), Align2::RIGHT_CENTER, "harmonics", mono(9.0), DIM);
                 painter.text(Pos2::new(dp.right() - 14.0, bt + 58.0), Align2::RIGHT_CENTER, "vs signal", mono(9.0), DIM);
@@ -158,9 +158,9 @@ pub fn create(params: Arc<PreParams>, meters: Arc<Meters>) -> Option<Box<dyn Edi
                 x += 80.0 + 10.0;
                 title("TONE", x, cw * 4.0);
                 knob_r(ui, setter, &p.lowcut, "LOW CUT", cell(x), "High-pass filter against rumble and proximity boom, 20 to 300 Hz. At the far left it is off.", false, r);
-                knob_r(ui, setter, &p.warmth, "WARMTH", cell(x + cw), "Low shelf at 120 Hz, +/- 6 dB: body and weight.", true, r);
-                knob_r(ui, setter, &p.presence, "PRESENCE", cell(x + cw * 2.0), "Bell at 3.5 kHz, +/- 6 dB: intelligibility and forwardness.", true, r);
-                knob_r(ui, setter, &p.silk, "SILK", cell(x + cw * 3.0), "High shelf at 10 kHz, +/- 6 dB: smooth air on the top.", true, r);
+                knob_ac(ui, setter, &p.warmth, "WARMTH", cell(x + cw), "Low shelf at 120 Hz, +/- 6 dB: body and weight.", true, r, C_LF);
+                knob_ac(ui, setter, &p.presence, "PRESENCE", cell(x + cw * 2.0), "Bell at 3.5 kHz, +/- 6 dB: intelligibility and forwardness.", true, r, C_HMF);
+                knob_ac(ui, setter, &p.silk, "SILK", cell(x + cw * 3.0), "High shelf at 10 kHz, +/- 6 dB: smooth air on the top.", true, r, C_HF);
                 x += cw * 4.0 + 10.0;
                 title("OUT", x, cw * 2.0 - 20.0);
                 knob_r(ui, setter, &p.mix, "MIX", cell(x - 6.0), "Parallel blend: 0 = dry, 100 = fully processed.", false, r);
