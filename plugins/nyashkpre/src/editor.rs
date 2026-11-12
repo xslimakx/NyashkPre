@@ -14,6 +14,8 @@ const BASE_W: f32 = 700.0;
 const BASE_H: f32 = 450.0;
 
 struct Gui {
+    spec: nyashk_common::analyzer::Spectrum,
+    trace: Vec<f32>,
     in_pk: f32,
     out_pk: f32,
     in_hold: f32,
@@ -26,7 +28,7 @@ pub fn create(params: Arc<PreParams>, meters: Arc<Meters>) -> Option<Box<dyn Edi
     let size_state = editor_state.clone();
     create_egui_editor(
         editor_state,
-        Gui { in_pk: -90.0, out_pk: -90.0, in_hold: -90.0, out_hold: -90.0, color: -90.0 },
+        Gui { spec: nyashk_common::analyzer::Spectrum::new(4096), trace: vec![0.0; 1024], in_pk: -90.0, out_pk: -90.0, in_hold: -90.0, out_hold: -90.0, color: -90.0 },
         |ctx, _| apply_theme(ctx),
         move |ctx, setter, st| {
             ctx.request_repaint_after(Duration::from_millis(33));
@@ -37,6 +39,8 @@ pub fn create(params: Arc<PreParams>, meters: Arc<Meters>) -> Option<Box<dyn Edi
             st.out_pk = fall(st.out_pk, Meters::get(&meters.out_db));
             st.in_hold = st.in_hold.max(st.in_pk) - 0.12;
             st.out_hold = st.out_hold.max(st.out_pk) - 0.12;
+            st.spec.update(&meters.tap_out);
+            meters.tap_in.snapshot(&mut st.trace);
             let c = Meters::get(&meters.color_db);
             st.color += (c - st.color) * 0.2;
 
@@ -82,6 +86,19 @@ pub fn create(params: Arc<PreParams>, meters: Arc<Meters>) -> Option<Box<dyn Edi
                     })
                     .collect();
                 painter.with_clip_rect(tb).add(egui::Shape::line(pts, PathStroke::new(2.2, if on { WHITE } else { DIM })));
+                // live trace: where the signal sits on the curve right now (newest samples brightest)
+                if on {
+                    let g_in = 10f32.powf(p.gain.value() / 20.0);
+                    let clip = painter.with_clip_rect(tb);
+                    let n = st.trace.len();
+                    for (i, s) in st.trace.iter().enumerate().step_by(2) {
+                        let v = (s * g_in).clamp(-range, range);
+                        let y = dsp::shaper(pr.ch, pr.drive, v).clamp(-range, range);
+                        let a = (40.0 + 200.0 * i as f32 / n as f32) as u8;
+                        let pos = Pos2::new(tb.center().x + v / range * tb.width() * 0.5, tb.center().y - y / range * tb.height() * 0.5);
+                        clip.circle_filled(pos, 1.6, Color32::from_rgba_unmultiplied(0xff, 0xff, 0xff, a));
+                    }
+                }
                 painter.text(Pos2::new(tb.left() + 6.0, tb.top() + 8.0), Align2::LEFT_CENTER, "SATURATION CURVE", mono(9.0), DIM);
                 painter.text(Pos2::new(tb.center().x, tb.bottom() + 0.0), Align2::CENTER_BOTTOM, "in", mono(9.0), DIM);
 
@@ -99,6 +116,13 @@ pub fn create(params: Arc<PreParams>, meters: Arc<Meters>) -> Option<Box<dyn Edi
                     painter.vline(fx(f), tg.top()..=tg.bottom(), Stroke::new(1.0, LINE));
                     painter.text(Pos2::new(fx(f), tg.bottom() + 10.0), Align2::CENTER_CENTER, if f >= 1000.0 { format!("{}k", f / 1000.0) } else { format!("{}", f) }, mono(9.0), DIM);
                 }
+                // live output spectrum behind the tone curve
+                let spy = |d: f32| tg.bottom() - tg.height() * ((d + 90.0) / 90.0).clamp(-0.05, 1.05);
+                let sp = st.spec.points(fs, f_lo, f_hi.min(fs * 0.49), 160, 4.5, fx, spy);
+                nyashk_common::analyzer::draw_spectrum(&painter, tg, &sp, Color32::from_gray(26), Color32::from_gray(72));
+                for d in [-6.0f32, -3.0, 3.0, 6.0] {
+                    painter.with_clip_rect(tg).hline(tg.left()..=tg.right(), dy(d), Stroke::new(1.0, Color32::from_white_alpha(6)));
+                }
                 let tone = dsp::Tone::new(fs, &pr);
                 let cpts: Vec<Pos2> = (0..=200)
                     .map(|i| {
@@ -107,7 +131,7 @@ pub fn create(params: Arc<PreParams>, meters: Arc<Meters>) -> Option<Box<dyn Edi
                     })
                     .collect();
                 painter.with_clip_rect(tg).add(egui::Shape::line(cpts, PathStroke::new(2.0, WHITE)));
-                painter.text(Pos2::new(tg.left() + 8.0, tg.top() + 8.0), Align2::LEFT_CENTER, "TONE", mono(9.0), DIM);
+                painter.text(Pos2::new(tg.left() + 8.0, tg.top() + 8.0), Align2::LEFT_CENTER, "TONE  ·  SPECTRUM", mono(9.0), DIM);
 
                 // meters
                 let mx = dp.right() - 108.0;

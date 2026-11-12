@@ -14,11 +14,18 @@ pub struct Meters {
     pub out_db: AtomicU32,
     pub color_db: AtomicU32,
     pub fs: AtomicU32,
+    /// live input (mono) for the saturation trace, live output for the spectrum
+    pub tap_in: nyashk_common::tap::Tap,
+    pub tap_out: nyashk_common::tap::Tap,
 }
 impl Meters {
     fn new() -> Self {
         let m = (-90f32).to_bits();
-        Self { in_db: AtomicU32::new(m), out_db: AtomicU32::new(m), color_db: AtomicU32::new(m), fs: AtomicU32::new(48000f32.to_bits()) }
+        Self { in_db: AtomicU32::new(m), out_db: AtomicU32::new(m), color_db: AtomicU32::new(m),
+            fs: AtomicU32::new(48000f32.to_bits()),
+            tap_in: nyashk_common::tap::Tap::new(8192),
+            tap_out: nyashk_common::tap::Tap::new(8192),
+        }
     }
     pub fn get(a: &AtomicU32) -> f32 {
         f32::from_bits(a.load(Ordering::Relaxed))
@@ -157,6 +164,7 @@ impl Plugin for NyashkPre {
     }
 
     fn process(&mut self, buffer: &mut Buffer, _aux: &mut AuxiliaryBuffers, _c: &mut impl ProcessContext<Self>) -> ProcessStatus {
+        nyashk_common::demo::fill(buffer, f32::from_bits(self.meters.fs.load(Ordering::Relaxed)));
         nyashk_common::demo::sanitize(buffer);
         let Some(pre) = self.pre.as_mut() else { return ProcessStatus::Normal };
         let p = &self.params;
@@ -181,7 +189,9 @@ impl Plugin for NyashkPre {
             for (i, s) in frame.iter_mut().enumerate().take(n) {
                 x[i] = *s;
             }
+            self.meters.tap_in.push(if n == 2 { 0.5 * (x[0] + x[1]) } else { x[0] });
             pre.process(&dp, &mut x, n);
+            self.meters.tap_out.push(if n == 2 { 0.5 * (x[0] + x[1]) } else { x[0] });
             ipk = ipk.max(pre.in_peak);
             opk = opk.max(pre.out_peak);
             for (i, s) in frame.iter_mut().enumerate().take(n) {
