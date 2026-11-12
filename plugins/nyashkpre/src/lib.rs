@@ -46,7 +46,7 @@ fn db_param(name: &str, min: f32, max: f32, def: f32) -> FloatParam {
     FloatParam::new(name, def, FloatRange::Linear { min, max })
         .with_step_size(0.1)
         .with_smoother(SmoothingStyle::Linear(20.0))
-        .with_value_to_string(Arc::new(|v| format!("{:+.1}", v)))
+        .with_value_to_string(Arc::new(|v| format!("{:+.1}", (v * 10.0).round() / 10.0 + 0.0)))
 }
 
 #[derive(Params)]

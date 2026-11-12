@@ -103,7 +103,7 @@ pub fn create(params: Arc<PreParams>, meters: Arc<Meters>) -> Option<Box<dyn Edi
                 painter.text(Pos2::new(tb.center().x, tb.bottom() + 0.0), Align2::CENTER_BOTTOM, "in", mono(9.0), DIM);
 
                 // tone response
-                let tg = Rect::from_min_max(Pos2::new(tb.right() + 52.0, dp.top() + 14.0), Pos2::new(dp.right() - 130.0, dp.bottom() - 28.0));
+                let tg = Rect::from_min_max(Pos2::new(tb.right() + 52.0, dp.top() + 14.0), Pos2::new(dp.right() - 142.0, dp.bottom() - 28.0));
                 painter.rect_filled(tg, 4.0, Color32::from_rgb(0x07, 0x07, 0x07));
                 let (f_lo, f_hi, d_r) = (20.0f32, 20000.0f32, 9.0f32);
                 let fx = |f: f32| tg.left() + tg.width() * (f / f_lo).ln() / (f_hi / f_lo).ln();
@@ -134,7 +134,7 @@ pub fn create(params: Arc<PreParams>, meters: Arc<Meters>) -> Option<Box<dyn Edi
                 painter.text(Pos2::new(tg.left() + 8.0, tg.top() + 8.0), Align2::LEFT_CENTER, "TONE  ·  SPECTRUM", mono(9.0), DIM);
 
                 // meters
-                let mx = dp.right() - 108.0;
+                let mx = dp.right() - 124.0;
                 let bt = dp.top() + 16.0;
                 let bh = dp.height() - 52.0;
                 for (k, (name, lvl, hold)) in [("IN", st.in_pk, st.in_hold), ("OUT", st.out_pk, st.out_hold)].into_iter().enumerate() {
