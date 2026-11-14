@@ -34,6 +34,10 @@ impl Default for Params {
 }
 
 pub const WARMTH_F: f32 = 120.0;
+/// The top end goes into the saturation this much quieter and is lifted back after it: sibilants
+/// and breaths make far fewer harsh high harmonics, the tone is unchanged.
+pub const EMPH_F: f32 = 4500.0;
+pub const EMPH_DB: f32 = 6.0;
 pub const PRES_F: f32 = 3500.0;
 pub const SILK_F: f32 = 10000.0;
 
@@ -67,22 +71,37 @@ impl Tone {
     }
 }
 
-/// The static transfer curve of the saturation stage, `v` = signal after the gain stage.
-/// Small-signal gain is 1, so the stage stays level-neutral for quiet material.
-pub fn shaper(ch: Char, drive: f32, v: f32) -> f32 {
-    let k = 1.0 + 5.0 * drive;
-    let blend = (drive * 4.0).min(1.0);
-    let s = match ch {
-        // quadratic term inside the soft clipper: a strong 2nd harmonic, odd harmonics only when pushed
-        Char::Tube => {
-            let u = v * k;
-            sat_tanh(u + (0.12 + 0.30 * drive) * u * u) / k
-        }
-        Char::Clean => sat_tanh(v * k * 0.8) / (k * 0.8),
-        // the low / high split lives in the processor
-        Char::Iron => sat_tanh(v * k * 0.6) / (k * 0.6),
+/// How hard the stage is driven: the slope of the curve. Drive 0 % keeps a vocal at -18 dBFS
+/// (after the gain) practically clean (~0.05 % THD), 100 % gives a few per cent there - the
+/// range of a real vocal preamp pushed from clean to warm, not a guitar amp. Louder peaks bend
+/// more, as in hardware.
+pub fn drive_k(ch: Char, drive: f32) -> f32 {
+    let (k0, k1) = match ch {
+        Char::Tube => (0.4f32, 2.6f32),
+        Char::Iron => (0.45, 2.6),
+        Char::Clean => (0.35, 2.2),
     };
-    v + (s - v) * blend
+    k0 * (k1 / k0).powf(drive.clamp(0.0, 1.0))
+}
+
+/// Bias of the tube curve: the asymmetry that makes the even (2nd) harmonic.
+const TUBE_BIAS: f32 = 0.15;
+
+/// The static transfer curve of the saturation stage, `v` = signal after the gain stage.
+/// Small-signal gain is 1 and the curve is bounded, so the stage stays level-neutral for quiet
+/// material and never folds over on hot peaks.
+pub fn shaper(ch: Char, drive: f32, v: f32) -> f32 {
+    let k = drive_k(ch, drive);
+    match ch {
+        // a biased soft curve: smooth 2nd harmonic first, odd ones only when pushed
+        Char::Tube => {
+            let t0 = TUBE_BIAS.tanh();
+            let slope = 1.0 - t0 * t0;
+            ((k * v + TUBE_BIAS).tanh() - t0) / (k * slope)
+        }
+        // symmetric: odd harmonics, the low band of Iron is driven harder in the processor
+        Char::Clean | Char::Iron => (k * v).tanh() / k,
+    }
 }
 
 #[derive(Clone, Default)]
@@ -93,6 +112,8 @@ struct Chn {
     silk: Bq,
     split: Bq,
     dc: Bq,
+    pre: Bq,
+    de: Bq,
 }
 
 pub struct Pre {
@@ -102,6 +123,8 @@ pub struct Pre {
     tone: Tone,
     split: Coef,
     dc: Coef,
+    emph: Coef,
+    deemph: Coef,
     tick: u32,
     pub in_peak: f32,
     pub out_peak: f32,
@@ -123,6 +146,8 @@ impl Pre {
             tone: Tone::new(fs, &Params::default()),
             split: Coef::lowpass(fs, 180.0, 0.7071),
             dc: Coef::highpass(fs, 12.0, 0.7071),
+            emph: Coef::high_shelf(fs, EMPH_F, -EMPH_DB, 0.7),
+            deemph: Coef::high_shelf(fs, EMPH_F, EMPH_DB, 0.7),
             tick: 0,
             in_peak: 0.0,
             out_peak: 0.0,
@@ -148,7 +173,9 @@ impl Pre {
             self.tone = Tone::new(self.fs, p);
         }
         self.tick = self.tick.wrapping_add(1);
-        let comp = if p.auto_level { -0.55 * p.gain_db.max(0.0) } else { 0.0 };
+        // Auto Level: the gain comes back off at the output, so Gain only sets how hard the stage
+        // is hit (a little less than all of it: what the saturation itself shaves off the peaks)
+        let comp = if p.auto_level { -0.9 * p.gain_db } else { 0.0 };
         let g = self.sm_gain.tick(db_to_lin(p.gain_db));
         let og = self.sm_out.tick(db_to_lin(p.out_db + comp)) * if p.phase { -1.0 } else { 1.0 };
         let mix = self.sm_mix.tick(p.mix);
@@ -166,11 +193,14 @@ impl Pre {
                 let dc = self.dc;
                 let ch = p.ch;
                 let d = p.drive;
-                let mut y = self.os[i].process(v, |a| shaper(ch, d, a));
+                let (emph, deemph) = (self.emph, self.deemph);
+                let ve = st.pre.tick(&emph, v);
+                let mut y = self.os[i].process(ve, |a| shaper(ch, d, a));
+                y = st.de.tick(&deemph, y);
                 if ch == Char::Iron {
                     // extra weight: the low band is driven harder than the rest
                     let lo = st.split.tick(&split, v);
-                    let lo_s = shaper(Char::Iron, (d * 2.5).min(1.0), lo);
+                    let lo_s = shaper(Char::Iron, (d + 0.35).min(1.0), lo);
                     y += lo_s - lo;
                 }
                 if ch == Char::Tube {

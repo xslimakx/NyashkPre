@@ -42,7 +42,7 @@ fn tube_makes_second_harmonic_clean_does_not() {
     let mut p = Params { drive: 0.35, gain_db: 0.0, ch: Char::Tube, ..Default::default() };
     let (_, o) = run(&p, 1000.0, 0.3);
     let (h1, h2, h3) = (amp(&o, 1000.0), amp(&o, 2000.0), amp(&o, 3000.0));
-    assert!(h2 > 0.01 && h2 > h3 * 0.8, "tube: h2 {h2} h3 {h3}");
+    assert!(h2 > 0.003 && h2 > h3 * 2.0, "tube: h2 {h2} h3 {h3}");
     p.ch = Char::Clean;
     let (_, o) = run(&p, 1000.0, 0.3);
     let (c2, c3) = (amp(&o, 2000.0), amp(&o, 3000.0));
@@ -98,4 +98,24 @@ fn power_off_is_bypass() {
     let (i, o) = run(&p, 500.0, 0.3);
     let d: f32 = i.iter().zip(o.iter()).map(|(a, b)| (a - b).abs()).fold(0.0, f32::max);
     assert!(d < 0.01, "{d}");
+}
+
+/// A vocal preamp, not a fuzz: at the default settings a voice at -12 dBFS gets a few per cent of
+/// mostly 2nd harmonic, and even 100 % drive on hot peaks stays bounded (no fold-over).
+#[test]
+fn vocal_friendly_amount_of_colour() {
+    let thd = |p: &Params, a: f32| {
+        let (_, o) = run(p, 220.0, a);
+        let h1 = amp(&o, 220.0);
+        let h: f32 = (2..20).map(|k| amp(&o, 220.0 * k as f32).powi(2)).sum::<f32>().sqrt();
+        (h / h1, amp(&o, 440.0) / h1, amp(&o, 660.0) / h1)
+    };
+    let def = Params { drive: 0.3, gain_db: 6.0, ch: Char::Tube, auto_level: true, ..Default::default() };
+    let (t, h2, h3) = thd(&def, 0.25);
+    assert!(t < 0.04 && h2 > h3, "default tube at -12 dBFS: THD {:.2} %, h2 {h2} h3 {h3}", t * 100.0);
+    for ch in [Char::Tube, Char::Iron, Char::Clean] {
+        let hot = Params { drive: 1.0, gain_db: 6.0, ch, auto_level: true, ..Default::default() };
+        let (t, _, _) = thd(&hot, 0.5);
+        assert!(t < 0.35, "{ch:?} 100 % at -6 dBFS: THD {:.1} %", t * 100.0);
+    }
 }
