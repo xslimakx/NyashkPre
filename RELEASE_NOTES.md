@@ -1,3 +1,7 @@
+## NyashkPre 1.0.4
+
+- Level scale shows a plain 0 instead of +0.
+
 ## NyashkPre 1.0.3
 
 A vocal preamp again, not a fuzz.

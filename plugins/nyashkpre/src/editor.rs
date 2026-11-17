@@ -110,7 +110,7 @@ pub fn create(params: Arc<PreParams>, meters: Arc<Meters>) -> Option<Box<dyn Edi
                 let dy = |d: f32| tg.center().y - tg.height() * 0.5 * (d / d_r).clamp(-1.0, 1.0);
                 for d in [-6.0f32, -3.0, 0.0, 3.0, 6.0] {
                     painter.hline(tg.left()..=tg.right(), dy(d), Stroke::new(1.0, if d == 0.0 { MID } else { LINE }));
-                    painter.text(Pos2::new(tg.left() - 5.0, dy(d)), Align2::RIGHT_CENTER, format!("{:+.0}", d), mono(9.0), DIM);
+                    painter.text(Pos2::new(tg.left() - 5.0, dy(d)), Align2::RIGHT_CENTER, if d.abs() < 0.5 { "0".to_string() } else { format!("{:+.0}", d) }, mono(9.0), DIM);
                 }
                 for f in [50.0f32, 100.0, 500.0, 1000.0, 5000.0, 10000.0] {
                     painter.vline(fx(f), tg.top()..=tg.bottom(), Stroke::new(1.0, LINE));
