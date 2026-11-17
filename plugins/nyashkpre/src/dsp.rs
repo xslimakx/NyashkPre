@@ -201,7 +201,8 @@ impl Pre {
             // saturation: always through the same oversampled chain (so switching Drive on or off
             // never changes the phase or clicks); the curve itself fades in / out with sat_x
             let wet = {
-                let (split, dc, ch, d, sx) = (self.split, self.dc, p.ch, p.drive, self.sat_x);
+                let sx = self.sat_x * self.sat_x * (3.0 - 2.0 * self.sat_x);
+                let (split, dc, ch, d) = (self.split, self.dc, p.ch, p.drive);
                 let (emph, deemph) = (self.emph, self.deemph);
                 let ve = st.pre.tick(&emph, v);
                 let mut y = self.os[i].process(ve, |a| a + (shaper(ch, d, a) - a) * sx);

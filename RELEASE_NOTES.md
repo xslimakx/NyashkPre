@@ -1,3 +1,7 @@
+## NyashkPre 1.0.6
+
+- The Drive on / off fade is S-shaped (no corner at its start or end).
+
 ## NyashkPre 1.0.5
 
 - **Parallel Mix fixed:** the dry part of the mix skipped the oversampling filters the saturated part goes through, so the two were out of phase in the highs - a 50 % mix with Drive on dipped 8 dB around 6 kHz. Both now take the same path; the mix is flat (within 0.01 dB) from 1 to 16 kHz.
