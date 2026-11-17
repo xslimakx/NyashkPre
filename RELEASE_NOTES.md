@@ -1,3 +1,9 @@
+## NyashkPre 1.0.5
+
+- **Parallel Mix fixed:** the dry part of the mix skipped the oversampling filters the saturated part goes through, so the two were out of phase in the highs - a 50 % mix with Drive on dipped 8 dB around 6 kHz. Both now take the same path; the mix is flat (within 0.01 dB) from 1 to 16 kHz.
+- **Drive on / off without clicks:** turning Drive up from 0 or back to 0 switched between two different signal paths at once (a click and a jump in the top end). The path stays the same now and the saturation fades in / out over 10 ms.
+- New behaviour tests: distortion rises steadily with Drive for every character (Tube up to ~5 %, Iron ~3.5 %, Clean ~2.3 % at -12 dBFS), the tone controls sound exactly like the drawn curve, Auto Level keeps the level within ~2 dB from 0 to +24 dB gain.
+
 ## NyashkPre 1.0.4
 
 - Level scale shows a plain 0 instead of +0.

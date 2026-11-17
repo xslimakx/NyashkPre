@@ -114,12 +114,18 @@ struct Chn {
     dc: Bq,
     pre: Bq,
     de: Bq,
+    dc_dry: Bq,
 }
 
 pub struct Pre {
     fs: f32,
     ch: [Chn; 2],
     os: [Os2; 2],
+    /// the dry signal for the parallel mix goes through the same (linear) oversampling and DC
+    /// filters as the wet one, so both stay in phase (before, a 50 % mix dipped 8 dB at 6 kHz)
+    os_dry: [Os2; 2],
+    /// 0..1: how much of the saturation curve is used (fades over 10 ms when Drive goes to / from 0)
+    sat_x: f32,
     tone: Tone,
     split: Coef,
     dc: Coef,
@@ -143,6 +149,8 @@ impl Pre {
             fs,
             ch: Default::default(),
             os: [Os2::new(fs), Os2::new(fs)],
+            os_dry: [Os2::new(fs), Os2::new(fs)],
+            sat_x: 0.0,
             tone: Tone::new(fs, &Params::default()),
             split: Coef::lowpass(fs, 180.0, 0.7071),
             dc: Coef::highpass(fs, 12.0, 0.7071),
@@ -163,9 +171,10 @@ impl Pre {
 
     pub fn reset(&mut self) {
         self.ch = Default::default();
-        for o in self.os.iter_mut() {
+        for o in self.os.iter_mut().chain(self.os_dry.iter_mut()) {
             o.reset();
         }
+        self.sat_x = 0.0;
     }
 
     pub fn process(&mut self, p: &Params, x: &mut [f32; 2], n: usize) {
@@ -182,36 +191,32 @@ impl Pre {
         let pw = self.sm_pow.tick(if p.power { 1.0 } else { 0.0 });
         let (mut ipk, mut opk) = (0.0f32, 0.0f32);
         let t = self.tone;
+        let step = 1.0 / (0.010 * self.fs);
+        self.sat_x = if p.drive > 0.001 { (self.sat_x + step).min(1.0) } else { (self.sat_x - step).max(0.0) };
         for i in 0..n {
             let dry = x[i];
             ipk = ipk.max(dry.abs());
             let st = &mut self.ch[i];
             let v = dry * g;
-            // saturation (oversampled only when it does something)
-            let wet = if p.drive > 0.001 {
-                let split = self.split;
-                let dc = self.dc;
-                let ch = p.ch;
-                let d = p.drive;
+            // saturation: always through the same oversampled chain (so switching Drive on or off
+            // never changes the phase or clicks); the curve itself fades in / out with sat_x
+            let wet = {
+                let (split, dc, ch, d, sx) = (self.split, self.dc, p.ch, p.drive, self.sat_x);
                 let (emph, deemph) = (self.emph, self.deemph);
                 let ve = st.pre.tick(&emph, v);
-                let mut y = self.os[i].process(ve, |a| shaper(ch, d, a));
+                let mut y = self.os[i].process(ve, |a| a + (shaper(ch, d, a) - a) * sx);
                 y = st.de.tick(&deemph, y);
+                let lo = st.split.tick(&split, v);
                 if ch == Char::Iron {
                     // extra weight: the low band is driven harder than the rest
-                    let lo = st.split.tick(&split, v);
                     let lo_s = shaper(Char::Iron, (d + 0.35).min(1.0), lo);
-                    y += lo_s - lo;
+                    y += (lo_s - lo) * sx;
                 }
-                if ch == Char::Tube {
-                    y = st.dc.tick(&dc, y);
-                }
-                y
-            } else {
-                v
+                st.dc.tick(&dc, y)
             };
-            self.c_n += (wet - v) * (wet - v);
-            self.c_d += v * v;
+            let dry_m = st.dc_dry.tick(&self.dc, self.os_dry[i].process(v, |a| a));
+            self.c_n += (wet - dry_m) * (wet - dry_m);
+            self.c_d += dry_m * dry_m;
             // tone
             let mut y = wet;
             if t.hp_on {
@@ -220,7 +225,7 @@ impl Pre {
             y = st.warm.tick(&t.warm, y);
             y = st.pres.tick(&t.pres, y);
             y = st.silk.tick(&t.silk, y);
-            let o = (dry * g * (1.0 - mix) + y * mix) * og;
+            let o = (dry_m * (1.0 - mix) + y * mix) * og;
             let o = dry + (o - dry) * pw;
             opk = opk.max(o.abs());
             x[i] = o;
