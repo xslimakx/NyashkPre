@@ -234,7 +234,8 @@ class Panel:
         c = c * (1 - ew[..., None]) + np.array([0.78, 0.78, 0.8]) * ew[..., None]
         self.img = to_img(c * A[..., None] + np.array(bg) * (1 - A[..., None])).convert('RGBA')
         self.dr = ImageDraw.Draw(self.img)
-        self.ink_layer = Image.new('RGBA', (w, h)); self.idr = ImageDraw.Draw(self.ink_layer)
+        self.K = 2
+        self.ink_layer = Image.new('RGBA', (w * self.K, h * self.K)); self.idr = ImageDraw.Draw(self.ink_layer)
         for sx, sy in [(18, 18), (W - 18, 18), (18, H - 18), (W - 18, H - 18)]: self.put(hexscrew(14 * S), sx * S, sy * S)
     # ---- low level
     def refresh(self): self.dr = ImageDraw.Draw(self.img)
@@ -244,22 +245,28 @@ class Panel:
             self.img.alpha_composite(sh, (int(cx - sh.width / 2), int(cy - sh.height / 2)))
         self.img.alpha_composite(im, (int(cx - im.width / 2), int(cy - im.height / 2)))
     def text(self, t, x, y, size, col=None, bold=False, anchor='mm', sp=0):
-        col = col or self.ink; f = font(size * S, bold); d = self.idr; x *= S; y *= S
+        col = col or self.ink; Q = S * self.K; f = font(size * Q, bold); d = self.idr; x *= Q; y *= Q
         if sp:
-            wdt = sum(d.textlength(ch, font=f) for ch in t) + sp * S * (len(t) - 1)
+            wdt = sum(d.textlength(ch, font=f) for ch in t) + sp * Q * (len(t) - 1)
             xx = x - wdt / 2 if anchor[0] == 'm' else (x - wdt if anchor[0] == 'r' else x)
-            for ch in t: d.text((xx, y), ch, font=f, fill=col, anchor='l' + anchor[1]); xx += d.textlength(ch, font=f) + sp * S
+            for ch in t: d.text((xx, y), ch, font=f, fill=col, anchor='l' + anchor[1]); xx += d.textlength(ch, font=f) + sp * Q
         else: d.text((x, y), t, font=f, fill=col, anchor=anchor)
     def flush_ink(self):
         """silkscreen: slightly worn, with a hairline of shadow so it sits on the paint"""
-        ink = np.array(self.ink_layer).astype(np.float32) / 255
-        if ink[..., 3].max() == 0: return
+        big = np.array(self.ink_layer)
+        if big[..., 3].max() == 0: return
+        # premultiplied downsampling, so edges keep their colour
+        bf = big.astype(np.float32) / 255; bf[..., :3] *= bf[..., 3:4]
+        pm = to_img(np.clip(bf[..., :3], 0, 1), bf[..., 3]).resize((self.w, self.h), Image.LANCZOS)
+        ink = np.array(pm).astype(np.float32) / 255
+        ink[..., :3] = ink[..., :3] / np.maximum(ink[..., 3:4], 1e-4)
         wearm = np.clip(1 - self.wear * 0.25 * np.clip(noise(self.h, self.w, 1.0) * 0.6 + noise(self.h, self.w, 6) * 0.4 - 0.3, 0, 1), 0, 1)
         ink[..., 3] *= wearm
         self.img.alpha_composite(to_img(ink[..., :3], ink[..., 3]))
-        self.ink_layer = Image.new('RGBA', (self.w, self.h)); self.idr = ImageDraw.Draw(self.ink_layer); self.refresh()
+        self.ink_layer = Image.new('RGBA', (self.w * self.K, self.h * self.K)); self.idr = ImageDraw.Draw(self.ink_layer); self.refresh()
     def line(self, pts, col, width):
-        self.idr.line([(x * S, y * S) for x, y in pts], fill=col, width=int(width * S))
+        Q = S * self.K
+        self.idr.line([(x * Q, y * Q) for x, y in pts], fill=col, width=max(1, int(round(width * Q))))
     def inset(self, x0, y0, x1, y1, fill=(0.085, 0.085, 0.095), r=10):
         self.flush_ink()
         X0, Y0, X1, Y1 = x0 * S, y0 * S, x1 * S, y1 * S
@@ -301,8 +308,11 @@ class Panel:
         if led:
             for i in range(led['n']):
                 q = math.radians(-135 + 270 * i / (led['n'] - 1)); x, y = cx + led['r'] * math.sin(q), cy - led['r'] * math.cos(q)
-                self.idr.ellipse([(x - 1.8) * S, (y - 1.8) * S, (x + 1.8) * S, (y + 1.8) * S], fill=(22, 22, 24, 255) if not self.light else (120, 124, 130, 255))
-                self.idr.ellipse([(x - 1.0) * S, (y - 1.3) * S, (x + 0.6) * S, (y - 0.2) * S], fill=(60, 60, 64, 200) if not self.light else (90, 94, 100, 200))
+                Q = S * self.K
+                # an unlit LED: dark lens with a tiny specular dot
+                self.idr.ellipse([(x - 2.0) * Q, (y - 2.0) * Q, (x + 2.0) * Q, (y + 2.0) * Q], fill=(14, 14, 16, 255) if not self.light else (110, 114, 120, 255))
+                self.idr.ellipse([(x - 1.6) * Q, (y - 1.6) * Q, (x + 1.6) * Q, (y + 1.6) * Q], fill=(30, 30, 33, 255) if not self.light else (70, 74, 80, 255))
+                self.idr.ellipse([(x - 1.0) * Q, (y - 1.2) * Q, (x + 0.2) * Q, (y - 0.3) * Q], fill=(110, 110, 115, 150))
         self.flush_ink()
         im, ptr = knob_image(kind, D * S, cap)
         self.put(im, cx * S, cy * S)
@@ -372,8 +382,8 @@ class Panel:
         assets = os.path.join(repo, plugin_dir, 'assets', 'hw'); os.makedirs(assets, exist_ok=True)
         self.img.convert('RGB').save(os.path.join(assets, 'bg.jpg'), quality=90, optimize=True, subsampling=0)
         for name, im in self.overlays.items(): im.save(os.path.join(assets, name + '.png'), optimize=True)
-        glow = np.zeros((32 * S, 32 * S)); a, d, _ = disc(32 * S, 1); glow = np.exp(-(d / (6 * S)) ** 2)
-        to_img(np.ones((32 * S, 32 * S, 3)), glow).save(os.path.join(assets, 'glow.png'))
+        a, d, _ = disc(32 * S, 1); glow = 0.65 * np.exp(-(d / (3.5 * S)) ** 2) + 0.35 * np.exp(-(d / (8 * S)) ** 2); glow *= np.clip((16 * S - d) / (3 * S), 0, 1)
+        to_img(np.ones((32 * S, 32 * S, 3)), glow / glow.max()).save(os.path.join(assets, 'glow.png'))
         c = lambda t: '[' + ','.join(str(int(v)) for v in t) + ']'
         f = lambda v: f'{float(v):.2f}'
         out = ['//! Generated by tools/render_ui.py: positions of the controls on the rendered faceplate.', '#![allow(dead_code)]',

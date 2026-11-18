@@ -118,15 +118,21 @@ impl Hw {
     pub fn background(&self, p: &Painter, w: f32, h: f32) {
         self.image(p, "bg", Rect::from_min_size(self.o, Vec2::new(w, h)), Color32::WHITE);
     }
-    /// soft glowing LED dot (glow sprite + bright core)
+    /// soft glowing LED dot: additive halo + bloom (premultiplied colour with zero alpha adds
+    /// light instead of covering), then the lens itself
     pub fn led(&self, p: &Painter, c: Pos2, col: Color32, size: f32, level: f32) {
         if level <= 0.01 {
             return;
         }
-        let g = Color32::from_rgba_unmultiplied(col.r(), col.g(), col.b(), (90.0 * level) as u8);
-        self.image(p, "glow", Rect::from_center_size(c, Vec2::splat(size * 4.0)), g);
-        p.circle_filled(c, size * 0.55, col.gamma_multiply(0.6 + 0.4 * level));
-        p.circle_filled(c + Vec2::new(-size * 0.12, -size * 0.15), size * 0.25, Color32::from_rgba_unmultiplied(255, 255, 240, (160.0 * level) as u8));
+        let add = |k: f32| {
+            let m = (k * level).min(1.0);
+            Color32::from_rgba_premultiplied((col.r() as f32 * m) as u8, (col.g() as f32 * m) as u8, (col.b() as f32 * m) as u8, 0)
+        };
+        self.image(p, "glow", Rect::from_center_size(c, Vec2::splat(size * 7.0)), add(0.22));
+        self.image(p, "glow", Rect::from_center_size(c, Vec2::splat(size * 3.2)), add(0.55));
+        p.circle_filled(c, size * 0.62, col.gamma_multiply(0.35 + 0.65 * level));
+        let hot = (200.0 * level) as u8;
+        p.circle_filled(c, size * 0.30, Color32::from_rgba_unmultiplied(255, 250, 235, hot));
     }
 }
 
@@ -187,7 +193,10 @@ pub fn knob<P: Param>(ui: &mut Ui, hw: &Hw, setter: &ParamSetter, p: &P, k: &Kno
     }
     let norm = if changed { newv } else { p.unmodulated_normalized_value() };
     let painter = ui.painter();
-    // LED ring
+    // LED ring: follows the value with a short glide (cheap: one animated float per knob)
+    let shown = ui.ctx().animate_value_with_time(id.with("led"), norm, 0.07);
+    let norm_ptr = norm;
+    let norm = shown;
     if k.led_n > 1 {
         let from = if k.bip { 0.5 } else { 0.0 };
         let (lo, hi) = if norm < from { (norm, from) } else { (from, norm) };
@@ -203,16 +212,18 @@ pub fn knob<P: Param>(ui: &mut Ui, hw: &Hw, setter: &ParamSetter, p: &P, k: &Kno
             } else {
                 0.0
             };
-            hw.led(painter, pt, accent, 2.8, lvl);
+            hw.led(painter, pt, accent, 3.0, lvl);
         }
     }
     // hover / grab: a faint rim of light around the knob
-    if resp.hovered() || resp.dragged() {
-        let al = if resp.dragged() { 70 } else { 40 };
-        painter.circle_stroke(c, k.r * 0.86, Stroke::new(1.2_f32, Color32::from_white_alpha(al)));
+    let hov = ui.ctx().animate_bool_with_time(id.with("hov"), resp.hovered() || resp.dragged(), 0.15);
+    if hov > 0.01 {
+        let al = if resp.dragged() { 1.0 } else { 0.6 };
+        let a8 = (60.0 * hov * al) as u8;
+        painter.circle_stroke(c, k.r * 0.86, Stroke::new(1.2_f32, Color32::from_rgba_premultiplied(a8, a8, a8, 0)));
     }
     // pointer
-    let a = (-135.0 + 270.0 * norm).to_radians();
+    let a = (-135.0 + 270.0 * norm_ptr).to_radians();
     let dir = Vec2::new(a.sin(), -a.cos());
     let col = Color32::from_rgba_unmultiplied(k.ptr_col[0], k.ptr_col[1], k.ptr_col[2], k.ptr_col[3]);
     let seg = |r0: f32, r1: f32| [c + dir * r0, c + dir * r1];
@@ -253,7 +264,7 @@ pub fn knob<P: Param>(ui: &mut Ui, hw: &Hw, setter: &ParamSetter, p: &P, k: &Kno
             ui.data_mut(|d| d.insert_temp(edit_id, buf));
         }
     } else if resp.hovered() || resp.dragged() {
-        let txt = p.normalized_value_to_string(norm, true);
+        let txt = p.normalized_value_to_string(norm_ptr, true);
         bubble(ui.painter(), vr.center(), &txt);
         if !tip.is_empty() && !resp.dragged() {
             resp.on_hover_text(tip);
@@ -279,9 +290,11 @@ pub fn button(ui: &mut Ui, hw: &Hw, b: &BtnL, on: bool, tip: &str) -> bool {
     let resp = ui.interact(r, egui::Id::new(("hwbtn", b.id)), Sense::click());
     let p = ui.painter();
     let pressed = resp.is_pointer_button_down_on();
-    if on {
+    // the lamp behind the cap warms up / fades out instead of snapping
+    let lit = ui.ctx().animate_bool_with_time(egui::Id::new(("hwbtn_lit", b.id)), on, 0.16);
+    if lit > 0.005 {
         let tr = Rect::from_center_size(r.center() + Vec2::new(0.0, if pressed { 0.6 } else { 0.0 }), Vec2::new(b.tex_size.0, b.tex_size.1));
-        hw.image(p, b.tex, tr, Color32::WHITE);
+        hw.image(p, b.tex, tr, Color32::WHITE.gamma_multiply(lit));
     }
     if pressed {
         p.rect_filled(r.shrink(1.0), 4.0, Color32::from_black_alpha(50));
@@ -328,7 +341,7 @@ pub fn ladder(p: &Painter, hw: &Hw, l: &LadderL, level: f32, down: bool) {
         let col = l.colors.iter().rev().find(|(f, _)| t >= *f).map(|(_, c)| c32(*c)).unwrap_or(Color32::GREEN);
         let y1 = r.bottom() - k as f32 * seg - 1.2;
         let sr = Rect::from_min_max(Pos2::new(r.left() + 2.0, y1 - seg + 2.2), Pos2::new(r.right() - 2.0, y1));
-        hw.image(p, "glow", sr.expand(5.0), Color32::from_rgba_unmultiplied(col.r(), col.g(), col.b(), 70));
+        hw.image(p, "glow", sr.expand(6.0), Color32::from_rgba_premultiplied(col.r() / 4, col.g() / 4, col.b() / 4, 0));
         p.rect_filled(sr, 1.0, col);
     }
 }
