@@ -11,6 +11,8 @@ crate-type = ["cdylib", "lib"]
 [dependencies]
 nih_plug = { git = "https://github.com/robbert-vdh/nih-plug.git", default-features = false, features = ["vst3"] }
 nih_plug_egui = { path = "../../vendor/nih_plug_egui" }
+zune-jpeg = "0.4"
+zune-png = "0.4"
 nyashk_common = { path = "../../crates/common" }
 
 [features]
