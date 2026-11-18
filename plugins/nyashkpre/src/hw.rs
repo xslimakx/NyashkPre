@@ -206,6 +206,11 @@ pub fn knob<P: Param>(ui: &mut Ui, hw: &Hw, setter: &ParamSetter, p: &P, k: &Kno
             hw.led(painter, pt, accent, 2.8, lvl);
         }
     }
+    // hover / grab: a faint rim of light around the knob
+    if resp.hovered() || resp.dragged() {
+        let al = if resp.dragged() { 70 } else { 40 };
+        painter.circle_stroke(c, k.r * 0.86, Stroke::new(1.2_f32, Color32::from_white_alpha(al)));
+    }
     // pointer
     let a = (-135.0 + 270.0 * norm).to_radians();
     let dir = Vec2::new(a.sin(), -a.cos());
@@ -301,6 +306,7 @@ pub fn needle(p: &Painter, hw: &Hw, v: &VuL, t: f32, col: Color32) {
     clip.line_segment([pv + dir * r0, pv + dir * r1], Stroke::new(1.6_f32, col));
     hw.image(p, v.glass, hw.rect(v.rect), Color32::WHITE);
 }
+
 /// VU deflection for a dB value on a classic VU scale (-20..+3 VU)
 pub fn vu_t(db: f32) -> f32 {
     let lo = 10f32.powf(-20.0 / 20.0);
@@ -325,6 +331,21 @@ pub fn ladder(p: &Painter, hw: &Hw, l: &LadderL, level: f32, down: bool) {
         hw.image(p, "glow", sr.expand(5.0), Color32::from_rgba_unmultiplied(col.r(), col.g(), col.b(), 70));
         p.rect_filled(sr, 1.0, col);
     }
+}
+
+/// Peak-hold segment on an LED bar (0..1).
+pub fn ladder_hold(p: &Painter, hw: &Hw, l: &LadderL, hold: f32) {
+    if hold <= 0.02 {
+        return;
+    }
+    let r = hw.rect(l.rect);
+    let seg = r.height() / l.n as f32;
+    let k = ((hold.clamp(0.0, 1.0) * l.n as f32).ceil() as u32).clamp(1, l.n) - 1;
+    let t = k as f32 / l.n as f32;
+    let col = l.colors.iter().rev().find(|(f, _)| t >= *f).map(|(_, c)| c32(*c)).unwrap_or(Color32::GREEN);
+    let y1 = r.bottom() - k as f32 * seg - 1.2;
+    let sr = Rect::from_min_max(Pos2::new(r.left() + 2.0, y1 - seg + 2.2), Pos2::new(r.right() - 2.0, y1));
+    p.rect_filled(sr, 1.0, col.gamma_multiply(0.8));
 }
 
 /// Glass over a screen (after drawing its content).

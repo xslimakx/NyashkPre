@@ -19,14 +19,14 @@ pub const ASSETS: &[(&str, &[u8])] = &[
 
 pub const ACCENT: [u8; 3] = [240,74,58];
 pub const KNOBS: &[KnobL] = &[
-    KnobL { id: "gain", c: (106.00, 152.00), r: 50.00, ptr0: 0.00, ptr1: 23.10, ptr_w: 3.00, ptr_col: [250,245,240,255], engraved: false, skirt: (30.24, 40.74), led_r: 58.00, led_n: 31, bip: false },
-    KnobL { id: "drive", c: (66.00, 340.00), r: 22.00, ptr0: 2.64, ptr1: 14.78, ptr_w: 1.54, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 22.00, led_n: 15, bip: false },
-    KnobL { id: "lowcut", c: (226.00, 340.00), r: 22.00, ptr0: 2.64, ptr1: 14.78, ptr_w: 1.54, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 22.00, led_n: 15, bip: false },
-    KnobL { id: "warmth", c: (292.00, 340.00), r: 22.00, ptr0: 2.64, ptr1: 14.78, ptr_w: 1.54, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 22.00, led_n: 15, bip: true },
-    KnobL { id: "presence", c: (358.00, 340.00), r: 22.00, ptr0: 2.64, ptr1: 14.78, ptr_w: 1.54, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 22.00, led_n: 15, bip: true },
-    KnobL { id: "silk", c: (424.00, 340.00), r: 22.00, ptr0: 2.64, ptr1: 14.78, ptr_w: 1.54, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 22.00, led_n: 15, bip: true },
-    KnobL { id: "mix", c: (500.00, 340.00), r: 22.00, ptr0: 2.64, ptr1: 14.78, ptr_w: 1.54, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 22.00, led_n: 15, bip: false },
-    KnobL { id: "out", c: (566.00, 340.00), r: 22.00, ptr0: 2.64, ptr1: 14.78, ptr_w: 1.54, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 22.00, led_n: 15, bip: true },
+    KnobL { id: "gain", c: (106.00, 152.00), r: 50.00, ptr0: 5.04, ptr1: 23.10, ptr_w: 3.00, ptr_col: [250,245,240,255], engraved: false, skirt: (30.24, 40.74), led_r: 58.00, led_n: 31, bip: false },
+    KnobL { id: "drive", c: (66.00, 340.00), r: 22.00, ptr0: 5.54, ptr1: 15.15, ptr_w: 1.60, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 26.00, led_n: 15, bip: false },
+    KnobL { id: "lowcut", c: (226.00, 340.00), r: 22.00, ptr0: 5.54, ptr1: 15.15, ptr_w: 1.60, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 26.00, led_n: 15, bip: false },
+    KnobL { id: "warmth", c: (292.00, 340.00), r: 22.00, ptr0: 5.54, ptr1: 15.15, ptr_w: 1.60, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 26.00, led_n: 15, bip: true },
+    KnobL { id: "presence", c: (358.00, 340.00), r: 22.00, ptr0: 5.54, ptr1: 15.15, ptr_w: 1.60, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 26.00, led_n: 15, bip: true },
+    KnobL { id: "silk", c: (424.00, 340.00), r: 22.00, ptr0: 5.54, ptr1: 15.15, ptr_w: 1.60, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 26.00, led_n: 15, bip: true },
+    KnobL { id: "mix", c: (500.00, 340.00), r: 22.00, ptr0: 5.54, ptr1: 15.15, ptr_w: 1.60, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 26.00, led_n: 15, bip: false },
+    KnobL { id: "out", c: (566.00, 340.00), r: 22.00, ptr0: 5.54, ptr1: 15.15, ptr_w: 1.60, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 26.00, led_n: 15, bip: true },
 ];
 pub const BUTTONS: &[BtnL] = &[
     BtnL { id: "power", rect: (596.00, 21.00, 64.00, 22.00), tex: "btn_power", tex_size: (88.00, 46.00) },

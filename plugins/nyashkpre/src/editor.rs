@@ -155,6 +155,8 @@ pub fn create(params: Arc<PreParams>, meters: Arc<Meters>) -> Option<Box<dyn Edi
                 let lv = |d: f32| ((d + 48.0) / 48.0).clamp(0.0, 1.0);
                 hw::ladder(&painter, hwr, hw::find(lay::LADDERS, "in", |x| x.id), lv(st.in_pk), false);
                 hw::ladder(&painter, hwr, hw::find(lay::LADDERS, "out", |x| x.id), lv(st.out_pk), false);
+                hw::ladder_hold(&painter, hwr, hw::find(lay::LADDERS, "in", |x| x.id), lv(st.in_hold));
+                hw::ladder_hold(&painter, hwr, hw::find(lay::LADDERS, "out", |x| x.id), lv(st.out_hold));
 
                 // ---- controls
                 hw::knob(ui, hwr, setter, &p.gain, k("gain"), accent, "GAIN: input gain in dB. Pushes the signal into the saturation stage, like turning up a mic pre.");

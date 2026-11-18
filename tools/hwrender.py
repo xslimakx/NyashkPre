@@ -88,7 +88,7 @@ def cyl_knob(N, R_bot, R_top, off, cap_fn, wall_base, wall_metal=False, wall_rou
         nphi = phi + (np.sin(phi * ribs_) * rib_depth * 0.6 if ribs_ else 0)
         n = np.dstack([np.cos(nphi) * 0.85, np.sin(nphi) * 0.55, np.full_like(phi, 0.35)])
         n /= np.linalg.norm(n, axis=2, keepdims=True)
-        c = shade(n, base, metal, rough) * (0.75 + 0.25 * t)
+        c = (shade(n, base, metal, rough) + (np.array(base) * 0.22 if metal else 0)) * (0.75 + 0.25 * t)
         col = col * (1 - m[..., None]) + c * m[..., None]; A = np.maximum(A, m)
     t0 = 0
     if skirt:
@@ -144,16 +144,16 @@ def knob_image(kind, D, cap=None):
     if kind == 'alu':
         N = int(D * 1.25); R = D * 0.42; off = D * 0.10
         col, A = cyl_knob(N, R, R * 0.98, off, cap_alu(), [0.75, 0.75, 0.77], True, 0.35, ribs=110, rib_depth=0.35)
-        ptr = dict(r0=0.06 * D, r1=R * 0.80, w=max(1.5, D * 0.035 / S), col=(30, 30, 32, 235), kind='engraved')
+        ptr = dict(r0=R * 0.30, r1=R * 0.82, w=max(1.6, D * 0.035 / S), col=(30, 30, 32, 235), kind='engraved')
     elif kind == 'cap':
         N = int(D * 1.3); R = D * 0.42; off = D * 0.13
         col, A = cyl_knob(N, R, R * 0.9, off, cap_inset(cap), [0.09, 0.095, 0.1], False, 0.3, ribs=28, rib_depth=0.6)
-        ptr = dict(r0=0.0, r1=R * 0.86, w=max(1.5, D * 0.04 / S), col=(250, 250, 248, 255), kind='paint')
+        ptr = dict(r0=R * 0.12, r1=R * 0.86, w=max(1.6, D * 0.04 / S), col=(250, 250, 248, 255), kind='paint')
     elif kind == 'red':
         N = int(D * 1.25); R = D * 0.42; off = D * 0.12
         col, A = cyl_knob(N, R * 0.62, R * 0.58, off, cap_plastic([0.62, 0.05, 0.035], 0.2), [0.5, 0.04, 0.03], False, 0.25, ribs=8, rib_depth=1.2,
                           skirt=(R, off * 0.35, [0.8, 0.81, 0.83], True))
-        ptr = dict(r0=0.0, r1=R * 0.55, w=max(1.5, D * 0.03 / S), col=(250, 245, 240, 255), kind='paint', skirt=(R * 0.72, R * 0.97))
+        ptr = dict(r0=R * 0.12, r1=R * 0.55, w=max(1.6, D * 0.03 / S), col=(250, 245, 240, 255), kind='paint', skirt=(R * 0.72, R * 0.97))
     return to_img(col, A), ptr
 
 # ------------------------------------------------------------------ buttons / screws / glass
