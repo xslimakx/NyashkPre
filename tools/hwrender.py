@@ -158,28 +158,51 @@ def knob_image(kind, D, cap=None):
 
 # ------------------------------------------------------------------ buttons / screws / glass
 def button_image(w, h, on, accent, label, body=(0.30, 0.30, 0.32), wear=0.6):
-    pad = 12 * S; W_, H_ = w + 2 * pad, h + 2 * pad
-    yy, xx = np.mgrid[0:h, 0:w] + 0.5; r = 4 * S
+    """a frosted, slightly domed cap (no glow: the GUI adds the light spill around it)"""
+    yy, xx = np.mgrid[0:h, 0:w] + 0.5
+    r = 3.5 * S
     dx = np.maximum(np.maximum(r - xx, xx - (w - r)), 0); dy = np.maximum(np.maximum(r - yy, yy - (h - r)), 0)
-    a = np.clip(r - np.hypot(dx, dy) + 0.5, 0, 1); e = np.minimum.reduce([xx, yy, w - xx, h - yy])
-    hm = np.clip(e / (4 * S), 0, 1) * 4 * S
+    a = np.clip(r - np.hypot(dx, dy) + 0.5, 0, 1)
+    # pillow: superellipse dome, flat in the middle, rounding off near the edges
+    u = (xx - w / 2) / (w / 2); v = (yy - h / 2) / (h / 2)
+    q = np.clip(1 - (np.abs(u) ** 6 + np.abs(v) ** 6), 0, 1)
+    hm = q ** 0.35 * 3.0 * S
+    n = normals(g(hm, 0.8))
     acc = np.array(accent) / 255
-    base = acc * 0.95 + 0.05 if on else np.array(body)
-    n = normals(g(hm, 1)); col = shade(n, base, False, 0.3, amb=0.65)
-    if on: col = col * 0.7 + acc * 0.45 * np.exp(-(((xx - w / 2) / (w * 0.6)) ** 2 + ((yy - h / 2) / (h * 0.6)) ** 2))[..., None]
-    # worn edges: lighter rubbed corners, grime near the bottom
-    wearm = np.clip(noise(h, w, 2) * 0.5 + 0.5, 0, 1) * np.exp(-e / (2.5 * S))
-    col += 0.10 * wear * wearm[..., None]
-    col *= (1 - 0.06 * wear * smooth(0.6, 1.0, yy / h))[..., None]
-    im = to_img(col, a); d = ImageDraw.Draw(im)
-    fs = min(h * 0.40, 9.5 * S)
-    tc = (25, 22, 18, 235) if on else (210, 210, 205, 225)
-    d.text((w / 2, h / 2 + S * 0.5), label, font=font(fs, True), fill=tc, anchor='mm')
-    out = Image.new('RGBA', (W_, H_))
     if on:
-        gl = np.zeros((H_, W_)); gl[pad:pad + h, pad:pad + w] = a
-        out.alpha_composite(to_img(np.zeros((H_, W_, 3)) + acc, g(gl, 5 * S) * 0.75))
-    out.alpha_composite(im, (pad, pad)); return out
+        # light from inside: hot centre, deeper colour toward the rim
+        inner = np.exp(-((u * 0.9) ** 2 + (v * 1.1) ** 2) * 1.4)
+        base = acc * (0.55 + 0.45 * inner)[..., None] + np.array([1, 1, 0.95]) * (0.35 * inner ** 3)[..., None]
+        col = base + shade(n, [0, 0, 0], False, 0.25, amb=0.0) * 0.6
+    else:
+        base = np.array(body) * 0.62 + acc * 0.05
+        col = shade(n, base, False, 0.30, amb=0.65)
+    # rubbed edges and a little grime at the bottom
+    e = np.minimum.reduce([xx, yy, w - xx, h - yy])
+    wearm = np.clip(noise(h, w, 2) * 0.5 + 0.5, 0, 1) * np.exp(-e / (2.0 * S))
+    col += 0.03 * wear * wearm[..., None] * (0.4 if on else 1.0)
+    # glossy strip of light along the top of the cap
+    col += (0.13 * np.exp(-((v + 0.62) / 0.22) ** 2) * smooth(1.0, 0.75, np.abs(u)))[..., None]
+    col *= (1 - 0.05 * wear * smooth(0.6, 1.0, yy / h))[..., None]
+    im = to_img(col, a)
+    d = ImageDraw.Draw(im)
+    fs = min(h * 0.40, 9.5 * S)
+    if on:
+        d.text((w / 2, h / 2 + S * 0.5), label, font=font(fs, True), fill=(30, 22, 12, 220), anchor='mm')
+    else:
+        d.text((w / 2, h / 2 + S * 1.0), label, font=font(fs, True), fill=(0, 0, 0, 120), anchor='mm')
+        d.text((w / 2, h / 2 + S * 0.5), label, font=font(fs, True), fill=(205, 205, 200, 220), anchor='mm')
+    return im
+def button_well(w, h):
+    """the dark recess in the panel the cap sits in"""
+    pad = 3 * S; W_, H_ = w + 2 * pad, h + 2 * pad
+    yy, xx = np.mgrid[0:H_, 0:W_] + 0.5; r = 5 * S
+    dx = np.maximum(np.maximum(r - xx, xx - (W_ - r)), 0); dy = np.maximum(np.maximum(r - yy, yy - (H_ - r)), 0)
+    d = np.hypot(dx, dy); a = np.clip(r - d + 0.5, 0, 1); e = r - d
+    col = np.zeros((H_, W_, 3)) + 0.02
+    # lit lower lip, shaded upper lip (light comes from the top left)
+    col += (0.16 * np.exp(-np.clip(H_ - yy, 0, None) / (1.0 * S)) + 0.08 * np.exp(-np.clip(W_ - xx, 0, None) / (1.0 * S)))[..., None]
+    return to_img(col, a)
 def hexscrew(D):
     N = int(D); a, d, th = disc(N, N * 0.45); rn = d / (N * 0.45)
     h = np.where(rn < 0.9, 0.3, 0.3 - (rn - 0.9) * 3)
@@ -322,14 +345,17 @@ class Panel:
     def button(self, id, cx, cy, w, h, label, accent=None, body=(0.30, 0.30, 0.32)):
         accent = accent or self.accent
         self.flush_ink()
-        off = button_image(int(w * S), int(h * S), False, accent, label, body, self.wear)
-        on = button_image(int(w * S), int(h * S), True, accent, label, body, self.wear)
-        # shadow + off state into the background, lit state as an overlay
-        a = np.array(off)[..., 3] / 255; sh = layered_shadow(a, 0.8)
+        W_, H_ = int(w * S), int(h * S)
+        well = button_well(W_, H_)
+        self.img.alpha_composite(well, (int(cx * S - well.width / 2), int(cy * S - well.height / 2)))
+        off = button_image(W_, H_, False, accent, label, body, self.wear)
+        on = button_image(W_, H_, True, accent, label, body, self.wear)
+        # the cap throws a short shadow into the well
+        a = np.array(off)[..., 3] / 255; sh = layered_shadow(a, 0.55)
         self.img.alpha_composite(sh, (int(cx * S - sh.width / 2), int(cy * S - sh.height / 2)))
         self.img.alpha_composite(off, (int(cx * S - off.width / 2), int(cy * S - off.height / 2)))
         name = 'btn_' + id; self.overlays[name] = on
-        self.buttons.append(dict(id=id, rect=(cx - w / 2, cy - h / 2, w, h), tex=name, tex_size=(on.width / S, on.height / S)))
+        self.buttons.append(dict(id=id, rect=(cx - w / 2, cy - h / 2, w, h), tex=name, tex_size=(w, h), glow=accent))
     def screen(self, id, x, y, w, h, fill=(0.012, 0.013, 0.015)):
         self.recess_frame(x, y, x + w, y + h)
         arr = np.array(self.img).astype(float) / 255
@@ -348,7 +374,7 @@ class Panel:
         face = np.array([0.02, 0.018, 0.016]) + np.array(accent) / 255 * 0.30 * glow[..., None]
         face *= (1 + 0.02 * noise(H_, W_, 0.7))[..., None]
         im = to_img(face).convert('RGBA'); vd = ImageDraw.Draw(im)
-        Rr = min(H_ * 0.78, W_ * 0.36); fcx, fcy = W_ / 2, H_ * 0.30 + Rr
+        fcx, fcy = W_ / 2, H_ - 5 * S; Rr = min(fcy - 36 * S, W_ * 0.40)
         ang = lambda db: -48 + 96 * (10 ** (db / 20) - 0.1) / (10 ** (3 / 20) - 0.1)
         wcol = (235, 232, 224, 255); acc = tuple(accent) + (255,)
         arcp = lambda a0, a1, r: [(fcx + r * math.sin(math.radians(q)), fcy - r * math.cos(math.radians(q))) for q in np.linspace(a0, a1, 60)]
@@ -359,7 +385,7 @@ class Panel:
             vd.line([(fcx + Rr * math.sin(q), fcy - Rr * math.cos(q)), (fcx + (Rr + 9 * S) * math.sin(q), fcy - (Rr + 9 * S) * math.cos(q))], fill=cc, width=int(1.6 * S))
             if small and db in (-7, -2, -1, 1, 2): continue
             vd.text((fcx + (Rr + 20 * S) * math.sin(q), fcy - (Rr + 20 * S) * math.cos(q)), t, font=font(9 * S), fill=cc, anchor='mm')
-        if label: vd.text((fcx, H_ * 0.86), label, font=font(7 * S, True), fill=(150, 145, 135, 255), anchor='mm')
+        if label: vd.text((fcx, fcy - Rr * 0.42), label, font=font(7 * S, True), fill=(150, 145, 135, 255), anchor='mm')
         im = im.filter(ImageFilter.GaussianBlur(0.35))
         self.img.alpha_composite(im, (int(x * S), int(y * S))); self.refresh()
         name = 'glass_' + id; self.overlays[name] = glass(W_, H_, 6)
@@ -400,7 +426,7 @@ class Panel:
             out.append(f'    KnobL {{ id: "{k["id"]}", c: ({f(k["c"][0])}, {f(k["c"][1])}), r: {f(k["r"])}, ptr0: {f(p["r0"])}, ptr1: {f(p["r1"])}, ptr_w: {f(p["w"])}, ptr_col: {c(p["col"])}, engraved: {str(p["kind"]=="engraved").lower()}, skirt: ({f(p["skirt"][0])}, {f(p["skirt"][1])}), led_r: {f(k["led"][0])}, led_n: {k["led"][1]}, bip: {str(k["bip"]).lower()} }},')
         out.append('];\npub const BUTTONS: &[BtnL] = &[')
         for b in self.buttons:
-            r = b['rect']; out.append(f'    BtnL {{ id: "{b["id"]}", rect: ({f(r[0])}, {f(r[1])}, {f(r[2])}, {f(r[3])}), tex: "{b["tex"]}", tex_size: ({f(b["tex_size"][0])}, {f(b["tex_size"][1])}) }},')
+            r = b['rect']; out.append(f'    BtnL {{ id: "{b["id"]}", rect: ({f(r[0])}, {f(r[1])}, {f(r[2])}, {f(r[3])}), tex: "{b["tex"]}", tex_size: ({f(b["tex_size"][0])}, {f(b["tex_size"][1])}), glow: {c(b["glow"])} }},')
         out.append('];\npub const SCREENS: &[ScreenL] = &[')
         for s in self.screens:
             r = s['rect']; out.append(f'    ScreenL {{ id: "{s["id"]}", rect: ({f(r[0])}, {f(r[1])}, {f(r[2])}, {f(r[3])}), glass: "{s["glass"]}" }},')

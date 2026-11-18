@@ -29,12 +29,12 @@ pub const KNOBS: &[KnobL] = &[
     KnobL { id: "out", c: (566.00, 340.00), r: 22.00, ptr0: 5.54, ptr1: 15.15, ptr_w: 1.60, ptr_col: [30,30,32,235], engraved: true, skirt: (0.00, 0.00), led_r: 26.00, led_n: 15, bip: true },
 ];
 pub const BUTTONS: &[BtnL] = &[
-    BtnL { id: "power", rect: (596.00, 21.00, 64.00, 22.00), tex: "btn_power", tex_size: (88.00, 46.00) },
-    BtnL { id: "phase", rect: (550.00, 21.00, 36.00, 22.00), tex: "btn_phase", tex_size: (60.00, 46.00) },
-    BtnL { id: "tube", rect: (117.00, 306.00, 58.00, 20.00), tex: "btn_tube", tex_size: (82.00, 44.00) },
-    BtnL { id: "iron", rect: (117.00, 332.00, 58.00, 20.00), tex: "btn_iron", tex_size: (82.00, 44.00) },
-    BtnL { id: "clean", rect: (117.00, 358.00, 58.00, 20.00), tex: "btn_clean", tex_size: (82.00, 44.00) },
-    BtnL { id: "auto", rect: (606.00, 329.00, 60.00, 22.00), tex: "btn_auto", tex_size: (84.00, 46.00) },
+    BtnL { id: "power", rect: (596.00, 21.00, 64.00, 22.00), tex: "btn_power", tex_size: (64.00, 22.00), glow: [240,74,58] },
+    BtnL { id: "phase", rect: (550.00, 21.00, 36.00, 22.00), tex: "btn_phase", tex_size: (36.00, 22.00), glow: [240,74,58] },
+    BtnL { id: "tube", rect: (117.00, 306.00, 58.00, 20.00), tex: "btn_tube", tex_size: (58.00, 20.00), glow: [240,74,58] },
+    BtnL { id: "iron", rect: (117.00, 332.00, 58.00, 20.00), tex: "btn_iron", tex_size: (58.00, 20.00), glow: [240,74,58] },
+    BtnL { id: "clean", rect: (117.00, 358.00, 58.00, 20.00), tex: "btn_clean", tex_size: (58.00, 20.00), glow: [240,74,58] },
+    BtnL { id: "auto", rect: (606.00, 329.00, 60.00, 22.00), tex: "btn_auto", tex_size: (60.00, 22.00), glow: [240,74,58] },
 ];
 pub const SCREENS: &[ScreenL] = &[
     ScreenL { id: "sat", rect: (212.00, 78.00, 150.00, 150.00), glass: "glass_sat" },
