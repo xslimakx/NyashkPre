@@ -178,6 +178,12 @@ impl Pre {
     }
 
     pub fn process(&mut self, p: &Params, x: &mut [f32; 2], n: usize) {
+        // a NaN / inf from the host would stay in the filter memories for good: treat it as silence
+        for v in x.iter_mut() {
+            if !v.is_finite() {
+                *v = 0.0;
+            }
+        }
         if self.tick % 16 == 0 {
             self.tone = Tone::new(self.fs, p);
         }
